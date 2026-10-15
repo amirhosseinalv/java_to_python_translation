@@ -33,5 +33,30 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
             return indent(depth) + "print(" + exprText + ", end='')" + "\n";
         }
     }
+
+    @Override 
+    public String visitVarDecl(ofpParser.VarDeclContext ctx) {
+        // TODO: wrap in getSafePythonId(...) once Filippo pushes it
+        String varName = ctx.ID().getText();
+        String exprText;
+        if (ctx.expr() != null) {
+            exprText = visit(ctx.expr());
+        } else {
+            // No initializer: Python needs a value, so pick a default for the type
+            OFPType type = OFPType.get(ctx.type().getText());
+            if (type == OFPType.INT) {
+                exprText = "0";
+            } else if (type == OFPType.FLOAT) {
+                exprText = "0.0";
+            } else if (type == OFPType.BOOL) {
+                exprText = "False";
+            } else if (type == OFPType.CHAR) {
+                exprText = "''";
+            } else {
+                exprText = "\"\"";
+            }
+        }
+        return indent(depth) + varName + " = " + exprText + "\n";
+    }
     
 }
