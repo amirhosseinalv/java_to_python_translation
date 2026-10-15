@@ -2,6 +2,7 @@ package ofp;
 
 import generated.ofpBaseVisitor;
 import java.util.HashMap;
+import generated.ofpParser;
 
 public class PythonGenerator extends ofpBaseVisitor<String> {
 
@@ -22,5 +23,15 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
         return indentCache.get(depthLevel);
     }
 
+    @Override 
+    public String visitPrintStmt(ofpParser.PrintStmtContext ctx) {
+        String exprText = visit(ctx.expr());
+        String printText = ctx.getChild(0).getText();
+        if (printText.equals("println")) {
+            return indent(depth) + "print(" + exprText + ")" + "\n"; 
+        } else {
+            return indent(depth) + "print(" + exprText + ", end='')" + "\n";
+        }
+    }
     
 }
