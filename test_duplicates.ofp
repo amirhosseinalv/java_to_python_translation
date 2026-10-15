@@ -1,0 +1,43 @@
+# Test program for duplicate declarations (based on lecture 2, slide 4)
+# Expected: 5 duplicate errors (lines 11, 14, 26, 30, 36), plus one follow-on
+# type error on line 27: the duplicate funcA body is checked against the first funcA.
+
+int funcA(int paramA) {
+	int ok = 1;
+
+	if (paramA > 0) {
+		int ok;              # OK - new block scope, shadowing is allowed
+	}
+
+	float paramA;            # ERROR - same scope as the parameter
+
+	int foo = 42;
+	int foo;                 # ERROR - same scope as the line above
+
+	int funcA;               # OK - no variable/parameter named funcA in this scope
+
+	return ok;
+}
+
+int[] makeArray() {
+	int[] a = {1, 2, 3};
+	return a;
+}
+
+float funcA(int paramA) {    # ERROR - duplicate function declaration
+	return 1.0;
+}
+
+int funcB(int paramB, int paramB) {   # ERROR - duplicate parameter
+	return paramB;
+}
+
+void main() {
+	int x = 1;
+	int x;                   # ERROR - same scope
+	while (x > 0) {
+		int x;               # OK - new block scope
+		x = x - 1;
+	}
+	println(x);
+}

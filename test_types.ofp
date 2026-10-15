@@ -1,0 +1,73 @@
+# Test program for the type checking phase.
+# Every line marked ERROR should be reported exactly once.
+
+int addInts(int a, int b) {
+	return a + b;
+}
+
+float half(float f) {
+	return f / 2.0;
+}
+
+void doNothing() {
+	return;
+}
+
+int badReturn(int n) {
+	return 1.5;                  # ERROR - float returned from an int function
+}
+
+void badVoidReturn() {
+	return 1;                    # ERROR - void function returns a value
+}
+
+void main() {
+	int i = 5;
+	float f = 1.5;
+	bool b = true;
+	char c = 'x';
+	string s = "hi";
+	int[] arr = {1, 2, 3};
+
+	# --- operators ---
+	int opA = i + 1;             # ok
+	int opB = i + b;             # ERROR - int + bool
+	float opC = f * 2.0;         # ok
+	bool cmpA = i < 10;          # ok
+	bool cmpB = i == f;          # ERROR - int compared with float
+
+	# --- conditions ---
+	if (i) {                     # ERROR - condition is int
+		println("never");
+	}
+	while (b) {                  # ok
+		b = false;
+	}
+
+	# --- assignment ---
+	i = 7;                       # ok
+	i = s;                       # ERROR - string into int
+	arr[0] = 9;                  # ok
+	arr[1] = c;                  # ERROR - char into an int[] element
+	arr[f] = 1;                  # ERROR - index is float
+
+	# --- arrays and strings ---
+	int lenA = arr.length;       # ok
+	int lenB = s.length;         # ok
+	int lenC = i.length;         # ERROR - int has no length
+	int el = arr[2];             # ok
+	char ch = s[0];              # ok
+	int bad = c[0];              # ERROR - char cannot be indexed
+
+	# --- calls ---
+	int cA = addInts(1, 2);      # ok
+	int cB = addInts(1);         # ERROR - too few arguments
+	int cC = addInts(1, 2, 3);   # ERROR - too many arguments
+	int cD = addInts(1, true);   # ERROR - argument 2 has the wrong type
+	float cE = half(2.0);        # ok
+	int cF = half(2.0);          # ERROR - float result into an int
+
+	# --- print ---
+	println(i);                  # ok
+	println(arr);                # ERROR - an array cannot be printed
+}

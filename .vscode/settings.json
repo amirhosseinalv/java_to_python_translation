@@ -1,0 +1,26 @@
+{
+  // Only "src" holds Java sources. This keeps the language server from
+  // compiling the ANTLR extension's scratch copies in ".antlr", which
+  // declare "package generated" but do not live in a "generated" folder.
+  "java.project.sourcePaths": ["src"],
+  "java.project.outputPath": "bin",
+  "java.project.referencedLibraries": [
+    "lib/*.jar"
+  ],
+  "java.import.exclusions": [
+    "**/.antlr/**",
+    "**/node_modules/**",
+    "**/.metadata/**"
+  ],
+  "antlr4.generation": {
+    "mode": "external",
+    "language": "Java",
+    "listeners": true,
+    "visitors": true,
+    "outputDir": "src/generated"
+  },
+  "antlr4.debug": {
+    "visualParseTreeHorizontal": true,
+    "visualParseTreeClustered": false
+  }
+}

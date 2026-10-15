@@ -1,0 +1,98 @@
+# Test program for function calls, returns and parameters.
+# Every line marked ERROR should be reported exactly once.
+
+int addInts(int a, int b) {
+	return a + b;                # ok
+}
+
+float half(float f) {
+	return f / 2.0;              # ok
+}
+
+char pick(char c, int n) {
+	return c;                    # ok
+}
+
+int missingValue() {
+	return;                      # ERROR - int function returns nothing
+}
+
+int wrongReturnType(int n) {
+	return 1.5;                  # ERROR - float from an int function
+}
+
+float wrongReturnTypeB(int n) {
+	return n;                    # ERROR - int from a float function
+}
+
+int[] wrongReturnArray() {
+	return 1;                    # ERROR - int from an int[] function
+}
+
+void voidWithValue() {
+	return 5;                    # ERROR - void function returns a value
+}
+
+void voidPlain() {
+	return;                      # ok
+}
+
+void voidNoReturn() {
+	println("nothing to return");    # ok - a void function need not return
+}
+
+int takesArray(int[] values) {
+	return values.length;        # ok
+}
+
+void main() {
+	int i = 3;
+	float f = 1.5;
+	bool b = true;
+	char c = 'a';
+	string s = "str";
+	int[] arr = {1, 2};
+
+	# --- argument count ---
+	int okCall = addInts(1, 2);          # ok
+	int tooFew = addInts(1);             # ERROR - 1 argument, 2 expected
+	int none = addInts();                # ERROR - 0 arguments, 2 expected
+	int tooMany = addInts(1, 2, 3);      # ERROR - 3 arguments, 2 expected
+
+	# --- argument types ---
+	int wrongFirst = addInts(true, 2);   # ERROR - argument 1 is bool
+	int wrongSecond = addInts(1, c);     # ERROR - argument 2 is char
+	int bothWrong = addInts(f, s);       # ERROR - both arguments wrong (2 errors)
+
+	# --- argument order matters ---
+	char okOrder = pick(c, i);           # ok
+	char badOrder = pick(i, c);          # ERROR - arguments swapped (2 errors)
+
+	# --- the call's own type ---
+	int fromInt = addInts(1, 2);         # ok
+	float fromFloat = half(2.0);         # ok
+	int wrongResult = half(2.0);         # ERROR - float result into int
+	float wrongResultB = addInts(1, 2);  # ERROR - int result into float
+
+	# --- array arguments ---
+	int viaArray = takesArray(arr);      # ok
+	int notArray = takesArray(i);        # ERROR - int where int[] is expected
+
+	# --- calls inside expressions ---
+	int nested = addInts(addInts(1, 2), 3);      # ok
+	int nestedBad = addInts(half(2.0), 3);       # ERROR - float argument
+	bool compared = addInts(1, 2) < 10;          # ok
+	bool comparedBad = addInts(1, 2) < f;        # ERROR - int compared with float
+
+	# --- calls as statements ---
+	voidPlain();                         # ok
+	addInts(1, 2);                       # ok - result discarded
+	addInts(1);                          # ERROR - wrong argument count
+
+	# --- void used as a value ---
+	int fromVoid = voidPlain();          # ERROR - void has no value
+	println(voidPlain());                # ERROR - cannot print void
+
+	# --- printing a call result ---
+	println(addInts(1, 2));              # ok
+}

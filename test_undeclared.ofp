@@ -1,0 +1,38 @@
+# Test program for undeclared identifiers (CheckRefListener).
+# Every line marked ERROR should be reported exactly once.
+# The analysis must reach the end of the file.
+
+int declared(int param) {
+	return param;                # ok - a parameter is declared
+}
+
+void main() {
+	int x = 1;
+	int[] arr = {1, 2, 3};
+
+	# --- variables ---
+	x = x + 1;                   # ok
+	x = notDeclared;             # ERROR - undeclared variable in an expression
+	notDeclaredEither = 5;       # ERROR - undeclared variable as assignment target
+	println(alsoMissing);        # ERROR - undeclared variable in print
+
+	# --- arrays ---
+	arr[0] = 1;                  # ok
+	missingArray[0] = 1;         # ERROR - undeclared array
+	arr[missingIndex] = 1;       # ERROR - undeclared variable used as index
+
+	# --- calls ---
+	int ok = declared(x);        # ok
+	int bad = missingFunc(x);    # ERROR - undeclared function
+	int args = declared(nope);   # ERROR - undeclared variable as an argument
+
+	# --- a variable is not a function ---
+	int notAFunction = x(1);     # ERROR - x is a variable, not a function
+
+	# --- scoping: out of scope, not undeclared in its own block ---
+	if (x < 5) {
+		int inner = 1;
+		println(inner);          # ok - visible here
+	}
+	println(inner);              # ERROR - inner is out of scope here
+}

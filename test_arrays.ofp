@@ -1,0 +1,73 @@
+# Test program for arrays and strings.
+# Every line marked ERROR should be reported exactly once.
+
+int takesArray(int[] values) {
+	return values.length;        # ok - .length on an array parameter
+}
+
+char[] makeChars() {
+	return {'a', 'b'};           # ok - char[] literal returned from a char[] function
+}
+
+int[] wrongLiteral() {
+	return {1.5, 2.5};           # ERROR - float[] returned from an int[] function
+}
+
+void main() {
+	int i = 2;
+	float f = 1.5;
+	char c = 'a';
+	string s = "text";
+	bool b = true;
+
+	# --- declarations ---
+	int[] good = {1, 2, 3};      # ok
+	float[] goodF = {1.5, 2.5};  # ok
+	char[] goodC = {'a', 'b'};   # ok
+	int[] mixed = {1, 'a'};      # ERROR - elements of different types
+	int[] wrongElem = {1.5};     # ERROR - float[] into int[]
+	# (bool[] is rejected by the grammar itself, so it cannot be tested here)
+	int[] sized = new int[5];    # ok
+	int[] sizedVar = new int[i]; # ok - the size is an int variable
+	int[] badSize = new int[f];  # ERROR - size is a float
+	float[] wrongNew = new int[2];   # ERROR - int[] into float[]
+	int[] noInit;                # ok - no initializer to check
+
+	# --- .length ---
+	int lenArr = good.length;    # ok
+	int lenStr = s.length;       # ok
+	int lenInt = i.length;       # ERROR - int has no length
+	int lenBool = b.length;      # ERROR - bool has no length
+
+	# --- indexing ---
+	int elem = good[0];          # ok - int[] element is int
+	float elemF = goodF[0];      # ok
+	char elemC = goodC[0];       # ok
+	char letter = s[0];          # ok - string element is char
+	int wrongElemType = goodF[0];    # ERROR - float element into int
+	int badIndex = good[f];      # ERROR - index is a float
+	int badIndexBool = good[b];  # ERROR - index is a bool
+	int notIndexable = i[0];     # ERROR - int cannot be indexed
+	int strAsInt = s[0];         # ERROR - string element is char, not int
+
+	# --- array assignment ---
+	good[0] = 7;                 # ok
+	good[i] = 7;                 # ok - index from a variable
+	goodC[0] = 'z';              # ok
+	good[0] = c;                 # ERROR - char into an int[] element
+	good[f] = 1;                 # ERROR - index is a float
+	i[0] = 1;                    # ERROR - i is not an array
+
+	# --- arrays through functions ---
+	int viaCall = takesArray(good);      # ok
+	int wrongArg = takesArray(i);        # ERROR - int where int[] is expected
+	int wrongArgF = takesArray(goodF);   # ERROR - float[] where int[] is expected
+	char[] fromCall = makeChars();       # ok
+	int[] wrongAssign = makeChars();     # ERROR - char[] into int[]
+
+	# --- printing ---
+	println(good.length);        # ok
+	println(good[0]);            # ok
+	println(s);                  # ok - a string is printable
+	println(good);               # ERROR - an array is not printable
+}

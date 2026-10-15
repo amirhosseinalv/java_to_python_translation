@@ -1,0 +1,133 @@
+# A completely valid OFP program.
+# Expected result: 0 errors in all three phases.
+# It exercises every construct the analyser must accept without complaining.
+
+int sumTo(int n) {
+	int i = one();
+	int sum = zero();
+	while (i < n + one()) {
+		sum = sum + i;
+		i = i + one();
+	}
+	return sum;
+}
+
+int one() { return 1; }
+int zero() { return 0; }
+
+float average(float total, int count) {
+	return total / 2.0;
+}
+
+char firstChar(string s) {
+	return s[0];
+}
+
+int arraySum(int[] values) {
+	int total = zero();
+	int i = zero();
+	while (i < values.length) {
+		total = total + values[i];
+		i = i + one();
+	}
+	return total;
+}
+
+int[] makeArray(int size) {
+	int[] result = new int[size];
+	result[0] = 42;
+	return result;
+}
+
+char[] letters() {
+	return {'a', 'b', 'c'};
+}
+
+void sideEffect(int x) {
+	println(x);
+	return;
+}
+
+void noReturnAtAll(bool flag) {
+	if (flag) {
+		println("yes");
+	} else {
+		println("no");
+	}
+}
+
+void main() {
+	# every primitive type
+	int i = 10;
+	float f = 2.5;
+	bool b = true;
+	char c = 'x';
+	string s = "hello world";
+
+	# arrays, all three element types
+	int[] ints = {1, 2, 3};
+	float[] floats = {1.5, 2.5};
+	char[] chars = letters();
+	int[] sized = new int[5];
+
+	# shadowing in a nested block is legal (bare blocks are not statements in
+	# this grammar, so the shadowing block is the body of an if)
+	if (b) {
+		int i = 99;
+		println(i);
+	}
+
+	# nested blocks and scopes
+	if (i < 20) {
+		int inner = i;
+		while (inner > 0) {
+			int deepest = inner;
+			inner = inner - one();
+		}
+	}
+
+	# operators
+	int sum = i + 1;
+	int diff = i - 1;
+	int prod = i * 2;
+	int quot = i / 2;
+	int neg = -i;
+	float fsum = f + 1.5;
+	bool less = i < 20;
+	bool more = i > 5;
+	bool eqInt = i == 10;
+	bool eqChar = c == 'x';
+	bool eqFloat = f == 2.5;
+	int paren = (i + 1) * 2;
+
+	# arrays and strings
+	int len = ints.length;
+	int strLen = s.length;
+	int element = ints[0];
+	char letter = s[1];
+	ints[2] = 7;
+	ints[i - 10] = 8;
+
+	# calls
+	int called = sumTo(5);
+	int viaArray = arraySum(ints);
+	float avg = average(10.0, 2);
+	char first = firstChar("abc");
+	int[] built = makeArray(3);
+	sideEffect(i);
+	noReturnAtAll(b);
+
+	# calls nested in expressions
+	int nested = sumTo(one() + zero());
+	bool compared = sumTo(3) < sumTo(4);
+
+	# print, every printable type
+	print(i);
+	println(f);
+	println(b);
+	println(c);
+	println(s);
+	println(ints.length);
+	println(ints[0]);
+	println(sumTo(2));
+}
