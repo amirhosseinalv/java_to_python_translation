@@ -1,16 +1,61 @@
 package ofp;
 
 import generated.ofpBaseVisitor;
+import generated.ofpParser;
+
+import java.util.Arrays;
 import java.util.HashMap;
 import generated.ofpParser;
+import java.util.HashSet;
+import java.util.List;
+
+import org.antlr.v4.runtime.tree.ParseTreeProperty;
 
 public class PythonGenerator extends ofpBaseVisitor<String> {
 
     private int depth = 0;
     private HashMap<Integer, String> indentCache;
+    private ParseTreeProperty<OFPScope> scopes;
+    private OFPScope currentScope;
+    private static HashSet<String> reservedIds = new HashSet<String>(Arrays.asList(
+        "False", "None", "True", "and", "as", "assert", "async", "await", "break",
+        "class", "continue", "def", "del", "elif", "else", "except", "finally",
+        "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
+        "not", "or", "pass", "raise", "return", "try", "while", "with", "yield",
+        "ArithmeticError", "AssertionError", "AttributeError", "BaseException",
+        "BlockingIOError", "BrokenPipeError", "BufferError", "BytesWarning",
+        "ChildProcessError", "ConnectionAbortedError", "ConnectionError",
+        "ConnectionRefusedError", "ConnectionResetError", "DeprecationWarning",
+        "EOFError", "Ellipsis", "EnvironmentError", "Exception", "False",
+        "FileExistsError", "FileNotFoundError", "FloatingPointError",
+        "FutureWarning", "GeneratorExit", "IOError", "ImportError",
+        "ImportWarning", "IndentationError", "IndexError", "InterruptedError",
+        "IsADirectoryError", "KeyError", "KeyboardInterrupt", "LookupError",
+        "MemoryError", "NameError", "None", "NotADirectoryError", "NotImplemented",
+        "NotImplementedError", "OSError", "OverflowError", "PendingDeprecationWarning",
+        "PermissionError", "ProcessLookupError", "RecursionError", "ReferenceError",
+        "ResourceWarning", "RuntimeError", "RuntimeWarning", "StopAsyncIteration",
+        "StopIteration", "SyntaxError", "SyntaxWarning", "SystemError",
+        "SystemExit", "TabError", "TimeoutError", "True", "TypeError",
+        "UnboundLocalError", "UnicodeDecodeError", "UnicodeEncodeError",
+        "UnicodeError", "UnicodeTranslateError", "UnicodeWarning", "UserWarning",
+        "ValueError", "Warning", "ZeroDivisionError", "__build_class__",
+        "__debug__", "__doc__", "__import__", "__loader__", "__name__",
+        "__package__", "__spec__", "abs", "all", "any", "ascii", "bin", "bool",
+        "bytearray", "bytes", "callable", "chr", "classmethod", "compile",
+        "complex", "copyright", "credits", "delattr", "dict", "dir", "divmod",
+        "enumerate", "eval", "exec", "exit", "filter", "float", "format",
+        "frozenset", "getattr", "globals", "hasattr", "hash", "help", "hex", "id",
+        "input", "int", "isinstance", "issubclass", "iter", "len", "license",
+        "list", "locals", "map", "max", "memoryview", "min", "next", "object",
+        "oct", "open", "ord", "pow", "print", "property", "quit", "range", "repr",
+        "reversed", "round", "set", "setattr", "slice", "sorted", "staticmethod",
+        "str", "sum", "super", "tuple", "type", "vars", "zip"
+    ));
 
-    public PythonGenerator() {
+    public PythonGenerator(ParseTreeProperty<OFPScope> scopes) {
         this.indentCache = new HashMap<>();
+        this.scopes = scopes;
     }
     
     private String indent(int depthLevel) {
@@ -57,6 +102,129 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
             }
         }
         return indent(depth) + varName + " = " + exprText + "\n";
+    }
+
+    private static String getSafePythonId(String id) {
+        if (reservedIds.contains(id)) {
+            return "ofp_" + id;
+        } else {
+            return id;
+        }
+    }
+
+    @Override 
+    public String visitIdExpr(ofpParser.IdExprContext ctx){
+        return getSafePythonId(ctx.ID().getText());
+    }
+
+    @Override
+    public String visitIntExpr(ofpParser.IntExprContext ctx) {
+        return ctx.INT().getText();
+    }
+
+    @Override
+    public String visitFloatExpr(ofpParser.FloatExprContext ctx) {
+        return ctx.FLOAT().getText();
+    }
+
+    @Override
+    public String visitBoolExpr(ofpParser.BoolExprContext ctx) {
+        return ctx.BOOL().getText().equals("true") ? "True" : "False";
+    }
+
+    @Override
+    public String visitCharExpr(ofpParser.CharExprContext ctx) {
+        return ctx.CHAR().getText();
+    }
+
+    @Override
+    public String visitStringExpr(ofpParser.StringExprContext ctx) {
+        return ctx.STRING().getText();
+    }
+
+    @Override
+    public String visitParenExpr(ofpParser.ParenExprContext ctx) {
+        return "(" + visit(ctx.expr()) + ")";
+    }
+
+    @Override
+    public String visitNegExpr(ofpParser.NegExprContext ctx) {
+        return "-" + visit(ctx.expr());
+    }
+
+    @Override
+    public String visitAddSubExpr(ofpParser.AddSubExprContext ctx) {
+        return visit(ctx.expr(0)) + " " + ctx.getChild(1).getText() + " " + visit(ctx.expr(1));
+    }
+
+    @Override
+    public String visitMulDivExpr(ofpParser.MulDivExprContext ctx) {
+        return visit(ctx.expr(0)) + " " + ctx.getChild(1).getText() + " " + visit(ctx.expr(1));
+    }
+
+    @Override
+    public String visitCompareExpr(ofpParser.CompareExprContext ctx) {
+        return visit(ctx.expr(0)) + " " + ctx.getChild(1).getText() + " " + visit(ctx.expr(1));
+    }
+
+    @Override
+    public String visitIndexExpr(ofpParser.IndexExprContext ctx) {
+        return visit(ctx.expr(0)) + "[" + visit(ctx.expr(1)) + "]";
+    }
+
+    @Override
+    public String visitLengthExpr(ofpParser.LengthExprContext ctx) {
+        return "len(" + visit(ctx.expr()) + ")";
+    }
+
+    @Override
+    public String visitArrayLiteralExpr(ofpParser.ArrayLiteralExprContext ctx) {
+        List<ofpParser.ExprContext> elements = ctx.expr();
+        StringBuilder result = new StringBuilder("[");
+        for (int i = 0; i < elements.size(); i++) {
+            if (i > 0) {
+                result.append(", ");
+            }
+            result.append(visit(elements.get(i)));
+        }
+        return result.append("]").toString();
+    }
+
+    @Override
+    public String visitNewArrayExpr(ofpParser.NewArrayExprContext ctx) {
+        String defaultValue;
+        switch (ctx.arrayType().getText()) {
+            case "int":
+                defaultValue = "0";
+                break;
+            case "float":
+                defaultValue = "0.0";
+                break;
+            case "char":
+                defaultValue = "''";
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported array type: " + ctx.arrayType().getText());
+        }
+        return "[" + defaultValue + "]*(" + visit(ctx.expr()) + ")";
+    }
+
+    @Override
+    public String visitCallExpr(ofpParser.CallExprContext ctx) {
+        return visit(ctx.funcCall());
+    }
+
+    @Override
+    public String visitFuncCall(ofpParser.FuncCallContext ctx) {
+        StringBuilder result = new StringBuilder(getSafePythonId(ctx.ID().getText())).append("(");
+        List<ofpParser.ExprContext> arguments = ctx.expr();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (i > 0) {
+                result.append(", ");
+            }
+            result.append(visit(arguments.get(i)));
+        }
+        return result.append(")").toString();
     }
     
 }
