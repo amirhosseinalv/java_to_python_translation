@@ -1,9 +1,7 @@
 package ofp;
 
-import java.util.HashMap;
-
 import generated.ofpBaseVisitor;
-import generated.ofpParser;
+import java.util.HashMap;
 
 public class PythonGenerator extends ofpBaseVisitor<String> {
 
@@ -13,4 +11,16 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
     public PythonGenerator() {
         this.indentCache = new HashMap<>();
     }
+    
+    private String indent(int depthLevel) {
+        if (!indentCache.containsKey(depthLevel)) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(" ".repeat(depthLevel * 4));
+            indentCache.put(depthLevel, sb.toString());
+            return sb.toString();
+        }
+        return indentCache.get(depthLevel);
+    }
+
+    
 }
