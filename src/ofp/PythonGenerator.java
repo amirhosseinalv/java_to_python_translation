@@ -68,7 +68,9 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
         return indentCache.get(depthLevel);
     }
 
-    @Override 
+    // ===== Statements & structure (Amirhossein) =====
+
+    @Override
     public String visitPrintStmt(ofpParser.PrintStmtContext ctx) {
         String exprText = visit(ctx.expr());
         String printText = ctx.getChild(0).getText();
@@ -81,8 +83,7 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
 
     @Override 
     public String visitVarDecl(ofpParser.VarDeclContext ctx) {
-        // TODO: wrap in getSafePythonId(...) once Filippo pushes it
-        String varName = ctx.ID().getText();
+        String varName = getSafePythonId(ctx.ID().getText());
         String exprText;
         if (ctx.expr() != null) {
             exprText = visit(ctx.expr());
@@ -103,6 +104,21 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
         }
         return indent(depth) + varName + " = " + exprText + "\n";
     }
+
+    @Override
+    public String visitArrayDecl(ofpParser.ArrayDeclContext ctx) {
+        String varName = getSafePythonId(ctx.ID().getText());
+        String exprText;
+        if (ctx.expr() != null) {
+            exprText = visit(ctx.expr());
+        } else {
+            // No initializer: an empty list still works with len()
+            exprText = "[]";
+        }
+        return indent(depth) + varName + " = " + exprText + "\n";
+    }
+
+    // ===== Expressions & safe names (Filippo) =====
 
     private static String getSafePythonId(String id) {
         if (reservedIds.contains(id)) {
@@ -226,5 +242,4 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
         }
         return result.append(")").toString();
     }
-    
 }
