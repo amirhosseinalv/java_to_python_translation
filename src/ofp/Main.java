@@ -6,11 +6,13 @@
 
 package ofp;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.antlr.v4.runtime.BufferedTokenStream;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
-import org.antlr.v4.gui.Trees;
 import generated.ofpLexer;
 import generated.ofpParser;
 
@@ -86,7 +88,24 @@ public class Main  {
         }
         System.out.println("=====================================");
 
-        Trees.inspect(root, parser);   // opens a GUI window and BLOCKS until closed
-        
+        // Python code generation (A3) - only valid programs are translated
+        if (totalErrors > 0) {
+            System.out.println("\nNo Python file generated: fix the errors above first");
+            System.exit(1);
+        }
+        PythonGenerator generator = new PythonGenerator(symbolTableListener.getScopes());
+        String pythonCode = generator.visit(root);
+
+        // X.ofp -> out/X.py (a separate folder, so the reference .py files are never overwritten)
+        String fileName = Paths.get(testProgram).getFileName().toString();
+        Path outputFile = Paths.get("out", fileName.replace(".ofp", ".py"));
+        try {
+            Files.createDirectories(outputFile.getParent());
+            Files.writeString(outputFile, pythonCode);
+        } catch (IOException e) {
+            System.out.println("\nCould not write the Python file: " + e.getMessage());
+            System.exit(-1);
+        }
+        System.out.println("\nPython code written to: " + outputFile);
     }
 }

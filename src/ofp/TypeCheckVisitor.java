@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 
 import generated.ofpBaseVisitor;
@@ -23,6 +24,19 @@ public class TypeCheckVisitor extends ofpBaseVisitor<OFPType> {
 
     public int getErrorCount(){
         return errorCount;
+    }
+
+    /**
+     * Used by PythonGenerator (A3): the type of a single expression, looked up in the given scope.
+     * The scopes are normally set while walking from visitProgram, so we set them by hand here.
+     */
+    public OFPType typeOf(ParseTree expr, OFPScope scope){
+        currentScope = scope;
+        globalScope = scope;
+        while (globalScope.getEnclosingScope() != null){
+            globalScope = globalScope.getEnclosingScope();
+        }
+        return visit(expr);
     }
 
     @Override

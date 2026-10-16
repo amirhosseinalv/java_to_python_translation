@@ -1,8 +1,11 @@
-# OFP Compiler — Assignment 2 (symbol table and semantic analysis)
+# OFP Compiler — Assignment 3 (Python code generation)
 
 Course 4DV507 / 4DT902, Linnaeus University.
 
 **Authors:** Amirhossein Alavi and Filippo Draghetti (submitted as a pair).
+
+Given a valid OFP program `X.ofp`, the compiler checks it (Assignment 2) and then
+generates an executable Python 3 program `out/X.py` with the same output.
 
 ## How to compile and run
 
@@ -12,14 +15,21 @@ Everything is plain Java plus the ANTLR jars in `lib/`. No build tool is needed.
 # from the project root
 javac -cp "lib/*" -d bin src/generated/*.java src/ofp/*.java
 
-# analyse a program (macOS/Linux)
-java -cp "bin:lib/*" ofp.Main test_valid.ofp
+# translate a program (macOS/Linux)
+java -cp "bin:lib/*" ofp.Main arrays.ofp
+
+# run the generated Python program
+python3 out/arrays.py
 
 # on Windows the classpath separator is ';'
-java -cp "bin;lib/*" ofp.Main test_valid.ofp
+java -cp "bin;lib/*" ofp.Main arrays.ofp
 ```
 
 If no file is given on the command line, `test.ofp` is used.
+
+The generated file is written to the `out/` folder (created if missing), so the
+reference files `arrays.py` and `strings.py` in the project root are never overwritten.
+A Python file is only generated when the semantic analysis finds no errors.
 
 In VS Code the project runs directly with the **Main** launch configuration;
 `.vscode/settings.json` already puts `lib/*.jar` on the classpath.
@@ -28,7 +38,32 @@ The parser and listeners/visitors in `src/generated/` were produced from `ofp.g4
 with the VS Code ANTLR extension (`"visitors": true`, output directory
 `src/generated`). Regenerate only if the grammar changes.
 
-## What the program prints
+## Translation rules (Assignment 3)
+
+`src/ofp/PythonGenerator.java` is a visitor (`ofpBaseVisitor<String>`): every
+`visitXxx` method returns the Python text for its node. Statements return complete
+lines (indentation + code + newline); expressions return only the expression text.
+
+| OFP | Python |
+|---|---|
+| `{ ... }` | indentation (4 spaces per level); an empty block becomes `pass` |
+| `int f(int a, int[] b) { ... }` | `def f(a, b):` (no types) |
+| body of `void main()` | top-level code at the end, after the `# Program entry point - main` header |
+| `int x = 5;` / `int x;` | `x = 5` / `x = 0` (defaults: `0`, `0.0`, `False`, `''`, `""`) |
+| `int[] a;` | `a = []` |
+| `print(x);` / `println(x);` | `print(x, end='')` / `print(x)` |
+| `new int[n]` | `[0]*n` (`[0.0]`, `['']` for float and char; `[0]*(n + 1)` when needed) |
+| `{1, 2, 3}` | `[1, 2, 3]` |
+| `a.length` | `len(a)` |
+| `true` / `false` | `True` / `False` |
+| int `a / b` | `int(a / b)` — OFP integer division truncates, Python `/` gives a float |
+| `( ... )` | kept, so precedence is preserved |
+| names that are Python keywords/builtins | prefixed with `ofp_` everywhere (`len` → `ofp_len`, `max` → `ofp_max`) |
+
+To decide whether `/` is an integer division, the generator tracks the current scope
+while it walks and asks `TypeCheckVisitor.typeOf(expr, scope)` for the operand type.
+
+## What the program prints (semantic analysis, Assignment 2)
 
 1. the symbol table as an indented scope tree
 2. one line per semantic error, each with its line number
@@ -66,9 +101,17 @@ The analysis never stops at the first error.
 | `src/ofp/TypeCheckVisitor.java` | walk 3: all type checking |
 | `src/ofp/PrintListener.java` | optional debug print of the parse tree (disabled in `Main`) |
 | `src/ofp/ScopeTest.java` | small standalone test of the scope classes |
-| `src/ofp/Main.java` | parses the input and runs the three walks |
+| `src/ofp/PythonGenerator.java` | A3: visitor that translates the parse tree to Python |
+| `src/ofp/Main.java` | parses the input, runs the three walks, writes `out/X.py` |
 
 ## Test programs
+
+Valid programs (each translates to Python and runs): `arithmetic.ofp`, `arrays.ofp`,
+`boolean.ofp`, `float.ofp`, `max.ofp`, `recursion.ofp`, `strings.ofp`, `while.ofp`,
+`test_valid.ofp`. The generated `out/strings.py` is identical to the reference
+`strings.py`; `out/arrays.py` differs only in spacing (`2 * n` vs `2*n`).
+
+Semantic-analysis tests (Assignment 2):
 
 | File | Expected |
 |---|---|
@@ -114,6 +157,16 @@ Every line in the error files is commented with the mistake it is meant to trigg
 - array literals must be homogeneous, and `new int[n]` needs an int size
 
 ## Known limitations
+
+**Code generation**
+- Python has no block scope. A variable redeclared in an inner block (shadowing) becomes
+  the same Python variable as the outer one, so its value leaks out of the block. The
+  reference `arrays.py` translates shadowing the same way (`n` in `reverse`). Example:
+  in `test_valid.ofp` the inner `int i = 99;` changes the outer `i`, so the later
+  `ints[i - 10] = 8;` fails with an `IndexError` in Python.
+- Booleans print as `True`/`False` (Python style), as in the reference files.
+
+**Semantic analysis**
 
 - Execution paths are not analysed, so a non-void function whose body can finish without
   a `return` is not reported. The assignment explicitly excludes this check.

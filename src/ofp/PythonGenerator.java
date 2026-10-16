@@ -5,7 +5,6 @@ import generated.ofpParser;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import generated.ofpParser;
 import java.util.HashSet;
 import java.util.List;
 
@@ -124,6 +123,12 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
     // A block is one indentation level deeper than the statement that owns it
     @Override
     public String visitBlock(ofpParser.BlockContext ctx) {
+        // Nested blocks have their own scope (function bodies share the function's scope, so this is null for them)
+        OFPScope blockScope = scopes.get(ctx);
+        OFPScope outerScope = currentScope;
+        if (blockScope != null) {
+            currentScope = blockScope;
+        }
         depth++;
         String body = "";
         for (ofpParser.StmtContext stmt : ctx.stmt()) {
@@ -134,6 +139,7 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
             body = indent(depth) + "pass\n";
         }
         depth--;
+        currentScope = outerScope;
         return body;
     }
 
@@ -166,6 +172,101 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
             result = result + indent(depth) + "else:\n" + visitBody(ctx.getChild(6));
         }
         return result;
+    }
+
+    // declStmt only wraps a declaration, so pass its text straight through
+    @Override
+    public String visitDeclStmt(ofpParser.DeclStmtContext ctx) {
+        return visit(ctx.declaration());
+    }
+
+    // x = 5;  ->  x = 5
+    @Override
+    public String visitAssignStmt(ofpParser.AssignStmtContext ctx) {
+        String varName = getSafePythonId(ctx.ID().getText());
+        return indent(depth) + varName + " = " + visit(ctx.expr()) + "\n";
+    }
+
+    // a[i] = n;  ->  a[i] = n   (expr(0) is the index, expr(1) is the value)
+    @Override
+    public String visitArrayAssignStmt(ofpParser.ArrayAssignStmtContext ctx) {
+        String arrayName = getSafePythonId(ctx.ID().getText());
+        String index = visit(ctx.expr(0));
+        String value = visit(ctx.expr(1));
+        return indent(depth) + arrayName + "[" + index + "] = " + value + "\n";
+    }
+
+    // return x;  ->  return x      return;  ->  return
+    @Override
+    public String visitReturnStmt(ofpParser.ReturnStmtContext ctx) {
+        if (ctx.expr() != null) {
+            return indent(depth) + "return " + visit(ctx.expr()) + "\n";
+        }
+        return indent(depth) + "return\n";
+    }
+
+    // foo(1, 2);  ->  foo(1, 2)   (Filippo's visitFuncCall builds the call text)
+    @Override
+    public String visitCallStmt(ofpParser.CallStmtContext ctx) {
+        return indent(depth) + visit(ctx.funcCall()) + "\n";
+    }
+
+    // int[] reverse(int[] arr) { ... }  ->  def reverse(arr): ...
+    // Python has no types, so only the parameter names are kept
+    @Override
+    public String visitFuncDecl(ofpParser.FuncDeclContext ctx) {
+        String funcName = getSafePythonId(ctx.ID().getText());
+        String paramNames = "";
+        if (ctx.params() != null) {
+            List<ofpParser.ParamContext> params = ctx.params().param();
+            for (int i = 0; i < params.size(); i++) {
+                if (i > 0) {
+                    paramNames = paramNames + ", ";
+                }
+                paramNames = paramNames + getSafePythonId(paramName(params.get(i)));
+            }
+        }
+        OFPScope outerScope = currentScope;
+        currentScope = scopes.get(ctx);
+        String body = visit(ctx.block());
+        currentScope = outerScope;
+        // A blank line after each function, like the reference files
+        return indent(depth) + "def " + funcName + "(" + paramNames + "):\n" + body + "\n";
+    }
+
+    // A param is either "int x" (valueParam) or "int[] x" (arrayParam); both end with the ID
+    private String paramName(ofpParser.ParamContext param) {
+        if (param instanceof ofpParser.ValueParamContext) {
+            return ((ofpParser.ValueParamContext) param).ID().getText();
+        }
+        return ((ofpParser.ArrayParamContext) param).ID().getText();
+    }
+
+    // main's body becomes top-level code (depth 0), so we visit its statements
+    // directly instead of calling visitBlock, which would indent them one level
+    @Override
+    public String visitMain(ofpParser.MainContext ctx) {
+        OFPScope outerScope = currentScope;
+        currentScope = scopes.get(ctx);
+        String body = "";
+        for (ofpParser.StmtContext stmt : ctx.block().stmt()) {
+            body = body + visit(stmt);
+        }
+        currentScope = outerScope;
+        return body;
+    }
+
+    // All functions first (main may come before or after them in OFP),
+    // then the header comment, then main's body as top-level code
+    @Override
+    public String visitProgram(ofpParser.ProgramContext ctx) {
+        currentScope = scopes.get(ctx);
+        String functions = "";
+        for (ofpParser.FuncDeclContext func : ctx.funcDecl()) {
+            functions = functions + visit(func);
+        }
+        String header = "#\n# Program entry point - main\n#\n";
+        return functions + header + visit(ctx.main());
     }
 
     // ===== Expressions & safe names (Filippo) =====
@@ -248,7 +349,7 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
         String rhs = visit(ctx.expr(1));
         //If it's a division i need to check if it's a int division
         if(op.equals("/")){
-            OFPType leftType = typeEvaluator.visit(ctx.expr(0));
+            OFPType leftType = typeEvaluator.typeOf(ctx.expr(0), currentScope);
             //If it is I need to cast the result since in OFP it's automatic but in Python the result would be a float
             if(leftType == OFPType.INT){
                 return "int(" + lhs + " / " + rhs + ")";            }
@@ -288,7 +389,12 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
             default:
                 throw new IllegalArgumentException("Unsupported array type: " + ctx.arrayType().getText());
         }
-        return "[" + defaultValue + "]*(" + visit(ctx.expr()) + ")";
+        String size = visit(ctx.expr());
+        // [0]*n+1 would mean ([0]*n)+1, so a +/- size needs parentheses: [0]*(n + 1)
+        if (ctx.expr() instanceof ofpParser.AddSubExprContext) {
+            size = "(" + size + ")";
+        }
+        return "[" + defaultValue + "]*" + size;
     }
 
     @Override
