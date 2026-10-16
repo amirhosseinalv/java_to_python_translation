@@ -17,6 +17,7 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
     private HashMap<Integer, String> indentCache;
     private ParseTreeProperty<OFPScope> scopes;
     private OFPScope currentScope;
+    private TypeCheckVisitor typeEvaluator;
     private static HashSet<String> reservedIds = new HashSet<String>(Arrays.asList(
         "False", "None", "True", "and", "as", "assert", "async", "await", "break",
         "class", "continue", "def", "del", "elif", "else", "except", "finally",
@@ -56,6 +57,7 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
     public PythonGenerator(ParseTreeProperty<OFPScope> scopes) {
         this.indentCache = new HashMap<>();
         this.scopes = scopes;
+        this.typeEvaluator = new TypeCheckVisitor(scopes);
     }
     
     private String indent(int depthLevel) {
@@ -117,79 +119,95 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
         return getSafePythonId(ctx.ID().getText());
     }
 
+    //Literal and array OFP-Python transformations
+
+    //INTs are the same in OFP and Python
     @Override
     public String visitIntExpr(ofpParser.IntExprContext ctx) {
         return ctx.INT().getText();
     }
-
+    //FLOATs are the same in OFP and Python
     @Override
     public String visitFloatExpr(ofpParser.FloatExprContext ctx) {
         return ctx.FLOAT().getText();
     }
-
+    //BOOLs are the same in OFP and Python with the difference of the first letter
     @Override
     public String visitBoolExpr(ofpParser.BoolExprContext ctx) {
         return ctx.BOOL().getText().equals("true") ? "True" : "False";
     }
-
+    //CHARs are the same in OFP and Python
     @Override
     public String visitCharExpr(ofpParser.CharExprContext ctx) {
         return ctx.CHAR().getText();
     }
-
+    //STRINGs are the same in OFP and Python
     @Override
     public String visitStringExpr(ofpParser.StringExprContext ctx) {
         return ctx.STRING().getText();
     }
-
+    //OFP: {... , ... , ...}, Python: [... , ... , ...]
     @Override
+    public String visitArrayLiteralExpr(ofpParser.ArrayLiteralExprContext ctx) {
+        StringBuilder buf = new StringBuilder();
+        for(int i = 0; i < ctx.expr().size(); i++){
+            if(i > 0){
+                buf.append(", ");
+            }
+            buf.append(visit(ctx.expr(i)));
+        }
+        return "[" + buf.toString() + "]";
+    }
+
+
+
+    //Its the same in OFP and python
+    @Override 
     public String visitParenExpr(ofpParser.ParenExprContext ctx) {
         return "(" + visit(ctx.expr()) + ")";
     }
-
+    //Its the same in OFP and python
     @Override
     public String visitNegExpr(ofpParser.NegExprContext ctx) {
         return "-" + visit(ctx.expr());
     }
-
+    //Its the same in OFP and python
     @Override
     public String visitAddSubExpr(ofpParser.AddSubExprContext ctx) {
         return visit(ctx.expr(0)) + " " + ctx.getChild(1).getText() + " " + visit(ctx.expr(1));
     }
-
-    @Override
-    public String visitMulDivExpr(ofpParser.MulDivExprContext ctx) {
-        return visit(ctx.expr(0)) + " " + ctx.getChild(1).getText() + " " + visit(ctx.expr(1));
+    //OFP: 3/2 == 1, Python: 3/2 == 1.5
+    @Override 
+    public String visitMulDivExpr(ofpParser.MulDivExprContext ctx){
+        String lhs = visit(ctx.expr(0));
+        String op = ctx.getChild(1).getText();
+        String rhs = visit(ctx.expr(1));
+        //If it's a division i need to check if it's a int division
+        if(op.equals("/")){
+            OFPType leftType = typeEvaluator.visit(ctx.expr(0));
+            //If it is I need to cast the result since in OFP it's automatic but in Python the result would be a float
+            if(leftType == OFPType.INT){
+                return "int(" + lhs + " / " + rhs + ")";            }
+        }
+        //If it was a multiplication it's fine
+        return lhs + " " + op + " " + rhs;
     }
-
+    //Its the same in OFP and python
     @Override
     public String visitCompareExpr(ofpParser.CompareExprContext ctx) {
         return visit(ctx.expr(0)) + " " + ctx.getChild(1).getText() + " " + visit(ctx.expr(1));
     }
-
+    //Its the same in OFP and python
     @Override
     public String visitIndexExpr(ofpParser.IndexExprContext ctx) {
         return visit(ctx.expr(0)) + "[" + visit(ctx.expr(1)) + "]";
     }
-
+    //OFP: lenght, Python: len
     @Override
     public String visitLengthExpr(ofpParser.LengthExprContext ctx) {
         return "len(" + visit(ctx.expr()) + ")";
     }
-
-    @Override
-    public String visitArrayLiteralExpr(ofpParser.ArrayLiteralExprContext ctx) {
-        List<ofpParser.ExprContext> elements = ctx.expr();
-        StringBuilder result = new StringBuilder("[");
-        for (int i = 0; i < elements.size(); i++) {
-            if (i > 0) {
-                result.append(", ");
-            }
-            result.append(visit(elements.get(i)));
-        }
-        return result.append("]").toString();
-    }
-
+    //OFP: new (int|float|char)[expr], Python: [0|0.0|'']*(expr)
     @Override
     public String visitNewArrayExpr(ofpParser.NewArrayExprContext ctx) {
         String defaultValue;
@@ -210,11 +228,6 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
     }
 
     @Override
-    public String visitCallExpr(ofpParser.CallExprContext ctx) {
-        return visit(ctx.funcCall());
-    }
-
-    @Override
     public String visitFuncCall(ofpParser.FuncCallContext ctx) {
         StringBuilder result = new StringBuilder(getSafePythonId(ctx.ID().getText())).append("(");
         List<ofpParser.ExprContext> arguments = ctx.expr();
@@ -226,5 +239,12 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
         }
         return result.append(")").toString();
     }
+
+    @Override
+    public String visitCallExpr(ofpParser.CallExprContext ctx) {
+        return visit(ctx.funcCall());
+    }
+
+   
     
 }
