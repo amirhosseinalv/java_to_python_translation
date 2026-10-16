@@ -9,6 +9,7 @@ import generated.ofpParser;
 import java.util.HashSet;
 import java.util.List;
 
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeProperty;
 
 public class PythonGenerator extends ofpBaseVisitor<String> {
@@ -118,6 +119,53 @@ public class PythonGenerator extends ofpBaseVisitor<String> {
             exprText = "[]";
         }
         return indent(depth) + varName + " = " + exprText + "\n";
+    }
+
+    // A block is one indentation level deeper than the statement that owns it
+    @Override
+    public String visitBlock(ofpParser.BlockContext ctx) {
+        depth++;
+        String body = "";
+        for (ofpParser.StmtContext stmt : ctx.stmt()) {
+            body = body + visit(stmt);
+        }
+        // Python does not allow an empty body, so {} becomes pass
+        if (body.isEmpty()) {
+            body = indent(depth) + "pass\n";
+        }
+        depth--;
+        return body;
+    }
+
+    // The body of while/if/else is either a block or a single statement.
+    // A block indents itself; a single statement needs us to indent it.
+    private String visitBody(ParseTree body) {
+        if (body instanceof ofpParser.BlockContext) {
+            return visit(body);
+        }
+        depth++;
+        String line = visit(body);
+        depth--;
+        return line;
+    }
+
+    @Override
+    public String visitWhileStmt(ofpParser.WhileStmtContext ctx) {
+        String cond = visit(ctx.expr());
+        // Children: while ( expr ) body  ->  the body is child 4
+        return indent(depth) + "while " + cond + ":\n" + visitBody(ctx.getChild(4));
+    }
+
+    @Override
+    public String visitIfStmt(ofpParser.IfStmtContext ctx) {
+        String cond = visit(ctx.expr());
+        // Children: if ( expr ) body [else body]  ->  then-body is child 4, else-body is child 6.
+        // We use positions because each body may be a stmt or a block, so stmt(0)/block(0) can't tell them apart.
+        String result = indent(depth) + "if " + cond + ":\n" + visitBody(ctx.getChild(4));
+        if (ctx.getChildCount() > 5) {
+            result = result + indent(depth) + "else:\n" + visitBody(ctx.getChild(6));
+        }
+        return result;
     }
 
     // ===== Expressions & safe names (Filippo) =====
