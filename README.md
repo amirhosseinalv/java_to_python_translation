@@ -29,7 +29,8 @@ If no file is given on the command line, `test.ofp` is used.
 
 The generated file is written to the `out/` folder (created if missing), so the
 reference files `arrays.py` and `strings.py` in the project root are never overwritten.
-A Python file is only generated when the semantic analysis finds no errors.
+Input programs are assumed to be valid, so a Python file is always generated. If the
+semantic analysis reports errors, a warning is printed, and the output may be invalid.
 
 In VS Code the project runs directly with the **Main** launch configuration;
 `.vscode/settings.json` already puts `lib/*.jar` on the classpath.
